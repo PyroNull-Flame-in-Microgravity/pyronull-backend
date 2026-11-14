@@ -53,3 +53,5 @@ The team guide recommends starting with BASS-II (prevention), SAME-R (detection)
 7. Add tests and deployment configuration.
 
 Never commit credentials, `.env`, private data or large raw NASA files. Commit `.env.example` instead.
+# pyronull-backend
+Backend API, NASA data integration, scientific data processing, and analytical services for PyroNull — a fire safety and combustion science platform.

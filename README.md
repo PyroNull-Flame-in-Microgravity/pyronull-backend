@@ -91,14 +91,6 @@ The team guide recommends starting with BASS-II (prevention), SAME-R (detection)
 - Research relevance is not fire probability, a hazard score or safety certification.
 - Mission Intelligence relevance values are unvalidated heuristics, not fire-risk or safety scores. Unknown fixture fields are not treated as zero or as proof that research does not exist.
 
-## Next steps
-1. Agree response contracts with frontend and AI/ML teammates.
-2. Replace placeholders with a verified NASA PSI source inventory.
-3. Implement source-aware parsing and metadata storage.
-4. Implement scientifically valid comparisons.
-5. Add document retrieval/RAG with page/section citations.
-6. Implement transparent relevance scoring and evaluation.
-7. Add tests and deployment configuration.
 
 Never commit credentials, `.env`, private data or large raw NASA files. Commit `.env.example` instead.
 # pyronull-backend

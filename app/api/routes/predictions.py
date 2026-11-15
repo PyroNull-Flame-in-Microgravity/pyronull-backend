@@ -1,6 +1,20 @@
 from fastapi import APIRouter, HTTPException
 
+from app.models.additional_predictions import (
+    Psi10InverseFlameRequest,
+    Psi10RegressionPredictionResponse,
+    Psi159IgnitionPredictionResponse,
+    Psi159IgnitionRequest,
+)
 from app.models.burn_time_prediction import BurnTimePredictionRequest, BurnTimePredictionResponse
+from app.services.additional_predictions import (
+    PredictionInferenceError,
+    PredictionModelUnavailable,
+    predict_psi10_pressure_rise,
+    predict_psi10_tad,
+    predict_psi10_zst,
+    predict_psi159_ignition,
+)
 from app.services.burn_time_prediction import (
     BurnTimeModelUnavailable,
     BurnTimePredictionError,
@@ -9,6 +23,47 @@ from app.services.burn_time_prediction import (
 
 
 router = APIRouter()
+
+
+def _handle_additional_prediction(function, payload):
+    try:
+        return function(payload)
+    except PredictionModelUnavailable as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    except PredictionInferenceError as exc:
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
+
+
+@router.post(
+    "/predictions/psi10/adiabatic-flame-temperature",
+    response_model=Psi10RegressionPredictionResponse,
+)
+def predict_psi10_adiabatic_flame_temperature(payload: Psi10InverseFlameRequest):
+    return _handle_additional_prediction(predict_psi10_tad, payload)
+
+
+@router.post(
+    "/predictions/psi10/stoichiometric-mixture-fraction",
+    response_model=Psi10RegressionPredictionResponse,
+)
+def predict_psi10_stoichiometric_mixture_fraction(payload: Psi10InverseFlameRequest):
+    return _handle_additional_prediction(predict_psi10_zst, payload)
+
+
+@router.post(
+    "/predictions/psi10/pressure-rise",
+    response_model=Psi10RegressionPredictionResponse,
+)
+def predict_psi10_pressure_rise_endpoint(payload: Psi10InverseFlameRequest):
+    return _handle_additional_prediction(predict_psi10_pressure_rise, payload)
+
+
+@router.post(
+    "/predictions/psi159/ignition",
+    response_model=Psi159IgnitionPredictionResponse,
+)
+def predict_psi159_ignition_endpoint(payload: Psi159IgnitionRequest):
+    return _handle_additional_prediction(predict_psi159_ignition, payload)
 
 
 @router.post("/predictions/burn-time", response_model=BurnTimePredictionResponse)

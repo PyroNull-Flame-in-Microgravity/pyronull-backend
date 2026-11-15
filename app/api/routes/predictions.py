@@ -1,6 +1,9 @@
 from fastapi import APIRouter, HTTPException
 
 from app.models.additional_predictions import (
+    AdditionalClassificationResponse,
+    Psi107FuelClassificationRequest,
+    Psi69FlameOutcomeRequest,
     Psi10InverseFlameRequest,
     Psi10RegressionPredictionResponse,
     Psi159IgnitionPredictionResponse,
@@ -10,6 +13,8 @@ from app.models.burn_time_prediction import BurnTimePredictionRequest, BurnTimeP
 from app.services.additional_predictions import (
     PredictionInferenceError,
     PredictionModelUnavailable,
+    predict_psi107_fuel,
+    predict_psi69_flame_outcome,
     predict_psi10_pressure_rise,
     predict_psi10_tad,
     predict_psi10_zst,
@@ -64,6 +69,22 @@ def predict_psi10_pressure_rise_endpoint(payload: Psi10InverseFlameRequest):
 )
 def predict_psi159_ignition_endpoint(payload: Psi159IgnitionRequest):
     return _handle_additional_prediction(predict_psi159_ignition, payload)
+
+
+@router.post(
+    "/predictions/psi107/fuel-classification",
+    response_model=AdditionalClassificationResponse,
+)
+def predict_psi107_fuel_endpoint(payload: Psi107FuelClassificationRequest):
+    return _handle_additional_prediction(predict_psi107_fuel, payload)
+
+
+@router.post(
+    "/predictions/psi69/flame-outcome",
+    response_model=AdditionalClassificationResponse,
+)
+def predict_psi69_flame_outcome_endpoint(payload: Psi69FlameOutcomeRequest):
+    return _handle_additional_prediction(predict_psi69_flame_outcome, payload)
 
 
 @router.post("/predictions/burn-time", response_model=BurnTimePredictionResponse)

@@ -1,5 +1,5 @@
 import math
-from typing import Dict, List, Optional
+from typing import Dict, List, Literal, Optional
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
@@ -104,6 +104,60 @@ class Psi159IgnitionPredictionResponse(BaseModel):
     prediction_target: str = "Hot ignition / flash classification"
     predicted_class: str
     predicted_class_code: int
+    output_unit: Optional[str] = None
+    evaluation_metrics: PredictionEvaluationMetrics
+    model_status: str = "AVAILABLE"
+    input_validation: PredictionInputValidation
+    provenance: PredictionProvenance
+    limitations: List[str]
+    scientific_warning: str
+
+
+class Psi107FuelClassificationRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    nozzle_mm: float = Field(gt=0, allow_inf_nan=False, description="Nozzle diameter in mm.")
+    fuel_rate_mg_s: float = Field(ge=0, allow_inf_nan=False, description="Fuel rate in mg/s.")
+    hydrocarbon_fuel_rate_mg_s: float = Field(ge=0, allow_inf_nan=False, description="Hydrocarbon fuel rate in mg/s.")
+    air_rate_cm_s: float = Field(allow_inf_nan=False, description="Air rate in cm/s; the source data includes negative values, so no sign restriction is applied.")
+
+    @field_validator("nozzle_mm", "fuel_rate_mg_s", "hydrocarbon_fuel_rate_mg_s", "air_rate_cm_s", mode="before")
+    @classmethod
+    def reject_non_finite_numbers(cls, value):
+        if isinstance(value, (int, float)) and not math.isfinite(value):
+            return repr(value)
+        return value
+
+
+class Psi69FlameOutcomeRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    ambient_pressure_mmhg: float = Field(ge=0, allow_inf_nan=False, description="Ambient pressure in mmHg.")
+    oxygen_mole_fraction: float = Field(ge=0, le=1, allow_inf_nan=False, description="Initial O mole fraction, matching the serialized preprocessor feature name.")
+    nitrogen_mole_fraction: float = Field(ge=0, le=1, allow_inf_nan=False, description="Initial N mole fraction, matching the serialized preprocessor feature name.")
+    carbon_monoxide_mole_fraction: float = Field(ge=0, le=1, allow_inf_nan=False, description="Initial CO mole fraction, matching the serialized preprocessor feature name.")
+    helium_mole_fraction: float = Field(ge=0, le=1, allow_inf_nan=False, description="Initial He mole fraction.")
+    droplet_initial_diameter_mm: float = Field(gt=0, allow_inf_nan=False, description="Initial droplet diameter in mm.")
+    fuel: Literal["Methanol", "Heptane"] = Field(description="Fuel category present in PSI-69 dataset.")
+
+    @field_validator(
+        "ambient_pressure_mmhg", "oxygen_mole_fraction", "nitrogen_mole_fraction",
+        "carbon_monoxide_mole_fraction", "helium_mole_fraction", "droplet_initial_diameter_mm",
+        mode="before",
+    )
+    @classmethod
+    def reject_non_finite_numbers(cls, value):
+        if isinstance(value, (int, float)) and not math.isfinite(value):
+            return repr(value)
+        return value
+
+
+class AdditionalClassificationResponse(BaseModel):
+    investigation_id: str
+    model_name: str
+    prediction_target: str
+    predicted_class: str
+    predicted_class_index: int
     output_unit: Optional[str] = None
     evaluation_metrics: PredictionEvaluationMetrics
     model_status: str = "AVAILABLE"

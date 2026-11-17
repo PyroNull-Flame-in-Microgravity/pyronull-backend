@@ -1,3 +1,4 @@
+import hashlib
 import json
 from types import SimpleNamespace
 
@@ -119,7 +120,9 @@ def test_model_is_loaded_once_and_reused(tmp_path, monkeypatch):
     calls = []
     fake_model = SimpleNamespace(feature_names_in_=prediction_service.MODEL_FEATURES)
     monkeypatch.setattr(prediction_service, "MODEL_PATH", tmp_path / "model.joblib")
-    (tmp_path / "model.joblib").write_bytes(b"mock artifact")
+    artifact_bytes = b"mock artifact"
+    (tmp_path / "model.joblib").write_bytes(artifact_bytes)
+    monkeypatch.setattr(prediction_service, "MODEL_SHA256", hashlib.sha256(artifact_bytes).hexdigest())
     monkeypatch.setattr(prediction_service.joblib, "load", lambda path: calls.append(path) or fake_model)
     prediction_service.load_model.cache_clear()
     try:
@@ -128,6 +131,13 @@ def test_model_is_loaded_once_and_reused(tmp_path, monkeypatch):
         assert len(calls) == 1
     finally:
         prediction_service.load_model.cache_clear()
+
+
+def test_installed_artifact_matches_pinned_sha256():
+    assert prediction_service.MODEL_PATH.is_file()
+    digest = hashlib.sha256(prediction_service.MODEL_PATH.read_bytes()).hexdigest()
+    assert digest == prediction_service.MODEL_SHA256
+    assert digest == "fa63f122f984f221df53e65c778e3d2d7a3a90b2a50a28ecf066e776967a3309"
 
 
 def test_missing_model_returns_service_unavailable(prediction_payload, tmp_path, monkeypatch):
@@ -141,10 +151,27 @@ def test_missing_model_returns_service_unavailable(prediction_payload, tmp_path,
     assert "artifact is not installed" in response.json()["detail"]
 
 
+def test_mismatched_model_is_rejected_before_deserialization(tmp_path, monkeypatch):
+    model_path = tmp_path / "altered.joblib"
+    model_path.write_bytes(b"not the approved artifact")
+    load_calls = []
+    monkeypatch.setattr(prediction_service, "MODEL_PATH", model_path)
+    monkeypatch.setattr(prediction_service, "joblib", SimpleNamespace(load=lambda path: load_calls.append(path)))
+    prediction_service.load_model.cache_clear()
+    try:
+        with pytest.raises(prediction_service.BurnTimeModelUnavailable, match="integrity check"):
+            prediction_service.load_model()
+    finally:
+        prediction_service.load_model.cache_clear()
+    assert load_calls == []
+
+
 def test_model_loading_error_returns_service_unavailable(prediction_payload, tmp_path, monkeypatch):
     model_path = tmp_path / "broken.joblib"
-    model_path.write_bytes(b"broken")
+    artifact_bytes = b"broken"
+    model_path.write_bytes(artifact_bytes)
     monkeypatch.setattr(prediction_service, "MODEL_PATH", model_path)
+    monkeypatch.setattr(prediction_service, "MODEL_SHA256", hashlib.sha256(artifact_bytes).hexdigest())
     monkeypatch.setattr(prediction_service.joblib, "load", lambda path: (_ for _ in ()).throw(ValueError("bad artifact")))
     prediction_service.load_model.cache_clear()
     try:

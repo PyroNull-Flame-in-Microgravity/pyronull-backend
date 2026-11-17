@@ -361,6 +361,36 @@ def discover_investigations(request: MissionQueryRequest) -> Dict[str, Any]:
     }
 
 
+def search_investigations_text(
+    query: str,
+    investigation_ids: Optional[List[str]] = None,
+    limit: int = 5,
+) -> List[Dict[str, str]]:
+    """Find fixture records by ID or lexical overlap without assuming a mission scenario."""
+    rows = load_investigations()
+    if investigation_ids:
+        requested = set(investigation_ids)
+        return [row for row in rows if row.get("psi_record_id") in requested][:limit]
+
+    query_words = _word_set(query)
+    if not query_words:
+        return []
+
+    searchable_fields = (
+        "psi_record_id", "investigation_title", "experiment_name", "research_category",
+        "research_objective", "fuel_material", "fuel_geometry", "gravity_environment",
+        "platform", "measurement_method", "instrument",
+    )
+    scored = []
+    for row in rows:
+        record_text = " ".join(_known(row.get(field)) or "" for field in searchable_fields)
+        overlap = len(query_words & _word_set(record_text))
+        if overlap:
+            scored.append((overlap, row.get("psi_record_id") or "", row))
+    scored.sort(key=lambda item: (-item[0], item[1]))
+    return [row for _, _, row in scored[:limit]]
+
+
 def identify_gaps(scenario: MissionScenarioRequest) -> Dict[str, Any]:
     rows = load_investigations()
     dimensions: List[Tuple[str, Optional[str], str]] = [

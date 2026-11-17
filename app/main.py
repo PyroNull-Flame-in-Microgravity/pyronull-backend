@@ -16,7 +16,10 @@ def _configured_cors_origins(environ=None):
 
 
 app = FastAPI(title="PyroNull / FIREWISE AI Backend", version="0.1.0",
-              description="Evidence-linked NASA microgravity combustion research APIs.")
+              description=(
+                  "Mission-intelligence and experimental combustion prediction APIs. "
+                  "Local research records are demo fixtures; NASA provenance and scientific validity are unverified."
+              ))
 app.add_middleware(CORSMiddleware, allow_origins=_configured_cors_origins(),
                    allow_credentials=True, allow_methods=["*"], allow_headers=["*"])
 app.include_router(api_router, prefix="/api/v1")

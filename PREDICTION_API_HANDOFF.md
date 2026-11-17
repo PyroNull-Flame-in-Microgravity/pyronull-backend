@@ -5,19 +5,20 @@
 ## Backend verification summary
 
 - Prediction API base path: `/api/v1/predictions`.
-- Five POST prediction endpoints are registered and tested: existing PSI-159 burn time plus three PSI-10 regressors and PSI-159 ignition classification.
-- Swagger: `http://localhost:8000/docs`; OpenAPI: `http://localhost:8000/openapi.json`.
-- Each model was run with its documented example inputs in the backend environment. Model artifacts are loaded lazily and cached per process. New PSI-10/ignition artifacts are SHA-256 checked before deserialization and their feature metadata is checked after load.
+- Seven POST prediction endpoints are registered and tested: PSI-159 burn time, three PSI-10 regressors, PSI-159 ignition classification, PSI-107 fuel classification, and PSI-69 flame outcome.
+- Swagger: `http://localhost:8001/docs`; OpenAPI: `http://localhost:8001/openapi.json`.
+- Actual inference for all seven endpoints passed in the previously verified local container. The current 133-test suite also exercises local model loading, including PSI-107/PSI-69 under their pinned SHA-256 checks. Those hashes identify the current bytes but do not establish source provenance or redistribution rights.
+- The three PSI-107/PSI-69 artifacts are excluded from the Git and Docker contexts pending written rights clearance. Their local inference results do not make a standard public Git checkout or full seven-model image reproducible; the Docker artifact guard will fail with their exact missing paths.
 - All model provenance statuses are `UNVERIFIED`. The local model repository and cards do not independently establish NASA source verification or scientific validation.
 - Successful predictions are experimental outputs, not certified spacecraft fire-safety assessments. Do not frame classifier labels as real-world ignition/fire probabilities.
-- The full backend suite passed: 88 tests. One pre-existing Pydantic deprecation warning remains in `reference/schemas.py`.
+- The current suite passed 133 tests with two warnings after the burn-time integrity and Docker allowlist changes. The Gemini provider tests use a mocked SDK client; no live Gemini request was made during this verification.
 
 ## Base URL, CORS, and request handling
 
 Set a frontend environment variable such as:
 
 ```text
-VITE_API_BASE_URL=http://localhost:8000
+VITE_API_BASE_URL=http://localhost:8001
 ```
 
 Have the existing frontend API client build requests as `${VITE_API_BASE_URL}/api/v1/...`. `VITE_API_BASE_URL` should be the origin only, without `/api/v1`, unless the client deliberately treats it as a complete API base. Do not hardcode the host in each page/card.
@@ -295,17 +296,17 @@ The complete response also includes `input_validation`, limitations, and a warni
 
 ## Loading, model-list endpoint, and compatibility
 
-- `GET /api/v1/predictions/models` **does not exist** (confirmed as 404). It is not required for the current fixed set of five frontend cards: the card/model mapping is static, and successful inference responses provide model name/status/provenance. A future dynamic model catalog would be a separate backend feature and should first define whether it lists only statically registered models or probes artifact readiness; it is not part of this handoff implementation.
-- The four added artifacts are SHA-256 checked and cached per process. A missing, altered, or incompatible model returns 503. Existing burn-time continues its own lazy cache and returns 503 if unavailable.
-- `/docs` and `/openapi.json` are available. Request and response schemas are attached to the five prediction POST routes.
-- The `/compare`, `/assistant/query`, and `/rank` legacy routes remain stubs returning HTTP 200 with `status: "NOT_IMPLEMENTED"`; frontend integration for the Predictive Lab should not depend on them. Mission Intelligence routes remain registered and unchanged.
+- `GET /api/v1/predictions/models` **does not exist** (confirmed as 404). It is not required for a static frontend card mapping; the backend currently exposes seven prediction endpoints. A future dynamic model catalog would be a separate backend feature and should first define whether it lists only statically registered models or probes artifact readiness.
+- All seven endpoint loaders (including the PSI-159 burn-time loader) check their pinned SHA-256 before deserialization and cache successful loads per process. A missing, altered, or incompatible model returns 503.
+- `/docs` and `/openapi.json` are available. Request and response schemas are attached to the seven prediction POST routes.
+- `/compare` and `/rank` remain `NOT_IMPLEMENTED` stubs. `/assistant/query` now uses Gemini with local fixture context; when matching context exists but Gemini is not configured, it returns HTTP 503. Fixture sources are labeled unverified, and the assistant is not a verified NASA document index. Mission Intelligence ranking behavior remains unchanged.
 - All model/source provenance is `UNVERIFIED`. PSI-10 cards report 87 samples with 20% test split while the cited inverse CSV contains 120 rows and does not explain the training subset. PSI-159 model documentation provides no sample/split counts. Do not imply NASA verification or scientific validation for mission environments.
 
 ## Frontend integration tasks (frontend-owned)
 
 The backend workspace contains no `PredictiveLabPage.tsx`, frontend API client, or React project, so these are integration targets to locate in the frontend repository rather than verified current paths:
 
-- Update `PredictiveLabPage.tsx` with five model-specific cards/forms and the request schemas above; do not merge output/units across models.
+- Map frontend cards to the required prediction endpoints, which currently number seven; do not merge output/units across models. PSI-107 and PSI-69 details are in `PREDICTIVE_MODELS_INTEGRATION_REPORT.md`.
 - Update the existing API client/service module (for example `src/services/api.ts` or `src/lib/api.ts`) to centralize `${VITE_API_BASE_URL}/api/v1` requests and JSON/error handling.
 - Add TypeScript request/response interfaces in the frontend's existing API types location; model PSI-10 shared inputs separately from PSI-159 categorical/numeric fields.
 - Add UI tests for request mapping, validation display, loading/success/422/500/503/network states, and scientific warning visibility.
@@ -325,8 +326,8 @@ Suggested card behavior:
 
 ### Backend completed
 
-- [x] Five prediction POST routes have explicit schemas and stable paths.
-- [x] Actual inference was exercised for all five artifacts; new artifact loading is cached and integrity checked.
+- [x] Seven prediction POST routes have explicit request/response schemas and stable paths.
+- [x] Actual local inference was exercised for all seven artifacts in the prior local container verification. The current public Git/Docker context intentionally excludes three artifacts, so all-seven deployment is not reproducible until rights and delivery are cleared.
 - [x] Request field mapping, units, validation and controlled HTTP errors are covered by tests.
 - [x] Swagger/OpenAPI, default development CORS, existing prediction routes, Mission Intelligence routes, and legacy route paths were checked.
 - [x] No frontend files were modified.
@@ -344,8 +345,8 @@ Suggested card behavior:
 ### Remaining blockers / caveats
 
 - [ ] Independent NASA/source/dataset verification and model scientific validation remain outstanding; no model is marked verified.
-- [ ] `/api/v1/predictions/models` is absent, but is not a blocker for the current fixed frontend design.
+- [ ] `/api/v1/predictions/models` is absent, but is not a blocker for a static frontend card mapping.
 - [ ] Frontend source was not present in the backend workspace, so exact frontend file paths/components beyond the named `PredictiveLabPage.tsx` cannot be confirmed here.
-- [ ] Legacy compare/assistant/rank remain explicit stubs and are outside the Predictive Lab integration.
+- [ ] Compare/rank remain explicit stubs and are outside the Predictive Lab integration. The assistant is Gemini-backed but does not have a verified NASA document corpus.
 
 **Handoff status:** backend contracts are ready for frontend integration. This is not a claim of production readiness or NASA/scientific verification.

@@ -211,7 +211,8 @@ def test_all_mission_endpoints_are_in_openapi_and_existing_routes_remain():
         assert "$ref" in schema
 
 
-def test_existing_routes_still_respond_without_changing_their_stub_contracts():
+def test_existing_routes_still_respond_and_assistant_keeps_its_response_shape(monkeypatch):
+    monkeypatch.delenv("GEMINI_API_KEY", raising=False)
     assert client.get("/api/v1/investigations").status_code == 200
     compare_response = client.post("/api/v1/compare", json={"investigation_ids": ["demo-a", "demo-b"]})
     assert compare_response.status_code == 200
@@ -226,14 +227,12 @@ def test_existing_routes_still_respond_without_changing_their_stub_contracts():
         ],
         "status": "NOT_IMPLEMENTED",
     }
-    assistant_response = client.post("/api/v1/assistant/query", json={"question": "Find combustion evidence"})
-    assert assistant_response.status_code == 200
-    assert assistant_response.json() == {
-        "answer": None,
-        "sources": [],
-        "limitations": ["Not connected to a verified NASA document index yet."],
-        "status": "NOT_IMPLEMENTED",
-    }
+    assistant_response = client.post(
+        "/api/v1/assistant/query",
+        json={"question": "Find combustion evidence", "investigation_ids": ["PSI-69"]},
+    )
+    assert assistant_response.status_code == 503
+    assert "GEMINI_API_KEY" in assistant_response.json()["detail"]
     rank_response = client.post("/api/v1/rank", json={"research_question": "flame spread"})
     assert rank_response.status_code == 200
     assert rank_response.json() == {

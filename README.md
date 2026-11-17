@@ -5,7 +5,7 @@ FastAPI backend for the PyroNull team's NASA Space Apps Challenge project, **Fla
 The product is an evidence-linked research dashboard to discover, compare and interpret NASA microgravity combustion investigations relevant to spacecraft fire prevention, detection and suppression. It is **not a certified spacecraft fire-risk predictor**.
 
 ## Current status
-The API includes a fixture-backed Mission Intelligence module. The records in `data/raw/psi_full_dataset.csv` and `data/raw/psi_investigations_dataset.csv` are explicitly marked demo data and have **not** been verified against NASA PSI. Existing `/investigations`, `/compare`, `/assistant/query`, and `/rank` routes retain their initial demo/stub behavior.
+The API includes a fixture-backed Mission Intelligence module. The records in `data/raw/psi_full_dataset.csv` and `data/raw/psi_investigations_dataset.csv` are explicitly marked demo data and have **not** been verified against NASA PSI. The older `/compare` and `/rank` routes retain their initial demo/stub behavior; `/assistant/query` uses optional Gemini generation grounded in matching local fixture records.
 
 ## API
 Base path: `/api/v1`
@@ -15,8 +15,8 @@ Base path: `/api/v1`
 | GET | `/investigations` | List/filter investigations |
 | GET | `/investigations/{id}` | Investigation detail |
 | POST | `/compare` | Compare investigations/runs |
-| POST | `/assistant/query` | Grounded research Q&A (not implemented yet) |
-| POST | `/rank` | Research relevance ranking (not implemented yet) |
+| POST | `/assistant/query` | Fixture-grounded research Q&A with optional Gemini generation |
+| POST | `/rank` | Legacy relevance-ranking stub |
 | GET | `/mission-intelligence/profiles` | List spacecraft, station, lunar, Mars, and rover mission profiles |
 | POST | `/mission-intelligence/scenario` | Validate a mission scenario and retain unspecified conditions as unknown |
 | POST | `/mission-intelligence/discover` | Discover fixture records with evidence and limitations |
@@ -31,7 +31,7 @@ Base path: `/api/v1`
 | POST | `/predictions/psi107/fuel-classification` | PSI-107 experimental fuel class |
 | POST | `/predictions/psi69/flame-outcome` | PSI-69 FLEX experimental flame outcome class |
 
-The legacy `/compare`, `/assistant/query`, and `/rank` routes currently return HTTP 200 with `status: "NOT_IMPLEMENTED"` and empty/stub result fields. Frontend clients must check `status` and must not interpret HTTP 200 as completed analysis. Existing request and response shapes are retained.
+The legacy `/compare` and `/rank` routes currently return HTTP 200 with `status: "NOT_IMPLEMENTED"` and empty/stub result fields. Frontend clients must check `status` and must not interpret HTTP 200 as completed analysis. `/assistant/query` is implemented separately and returns 503 if matching fixture context exists but Gemini is unavailable or misconfigured.
 
 ### PSI-159 burn-time prediction
 
@@ -69,7 +69,7 @@ The model artifact is loaded lazily once per application process. The prediction
 
 ## Additional research prediction models
 
-The following seven selected models are available in the prediction API: three PSI-10 models, two PSI-159 models, PSI-107 fuel classification, and PSI-69/02 flame outcome. Every successful response includes `model_status: "AVAILABLE"` and `provenance.verification_status: "UNVERIFIED"`. Model-card metrics are documentation-reported and were not independently reproduced unless explicitly stated. These are experimental research estimates/classifications, not certified fire-safety outputs. The new artifacts were copied from the locally extracted Predictive-Models repository after inspecting their documentation and serialization metadata; their upstream source and NASA provenance have not been independently verified. Artifact SHA-256 values are checked before lazy per-process loading.
+The API registers seven prediction endpoints: three PSI-10 models, two PSI-159 models, PSI-107 fuel classification, and PSI-69/02 flame outcome. Every successful response includes `model_status: "AVAILABLE"` and `provenance.verification_status: "UNVERIFIED"`. Model-card metrics are documentation-reported and were not independently reproduced unless explicitly stated. These are experimental research estimates/classifications, not certified fire-safety outputs. Some artifacts were copied from a locally extracted Predictive-Models repository after inspecting their documentation and serialization metadata; the upstream source and NASA provenance have not been independently verified. All model loaders verify a pinned SHA-256 before deserialization. Three PSI-107/PSI-69 artifacts remain excluded from Git and Docker pending redistribution clearance, so a clean Git checkout cannot build the complete seven-model service; see the provenance checklist and deployment handoff.
 
 ### Inventory of candidate models
 
@@ -80,8 +80,8 @@ The following seven selected models are available in the prediction API: three P
 | PSI-10 inverse-flame pressure rise | Integrated | `models/psi10/inverse_flame_pressure_rise_predictor.joblib` | Same PSI-10 inverse-flame CSV | `pfinal - pinit`; atm | MAE 0.001406 atm; R² 0.6030; card says 87 samples, 20% test split; exact partitions unavailable | UNVERIFIED; card/CSV sample counts disagree and data/source URL are unconfirmed; not a containment limit |
 | PSI-159 ignition classification | Integrated | `models/psi159/PSI_159_ignition_classifier_Predictive_Model.joblib` | `PSI-159_Experimental table_CFI-G_Inverse Flames.csv` and `PSI-159_Experimental table_CFI-G_Normal Flames.csv` | No ignition vs. hot ignition/flash; categorical class | Test accuracy 90.48%; five-fold CV 88.88% ± 2.83%; sample and split counts not given | UNVERIFIED; class output is not a real-world fire probability; source tables have differing schemas |
 | PSI-159 burn-time regression | Already integrated at `/api/v1/predictions/burn-time` | `models/PSI_159_burntime_regressor_Predictive_Model.joblib` | Same two PSI-159 CFI-G CSVs | Burn time; seconds | MAE 23.08 s; RMSE 36.14 s; R² 0.1575; sample/split counts not given | UNVERIFIED; see burn-time limitations above |
-| PSI-107 fuel classification | Integrated | `models/psi107/fuel_classifier_pipeline.joblib` | `PSI-107_Experimental table_Spice.csv` (469 rows in extracted repo) | Fuel class | Card reports accuracy 0.8191; split/sample counts not documented | UNVERIFIED; class sequence read from artifact and actual inference tested; raw CSV has whitespace label variants |
-| PSI-69 flame outcome classification (`02-Model`) | Integrated | `models/psi69/dnn_cls_model.keras` + `models/psi69/dnn_cls_preprocessor.joblib` | `PSI-69_Experimental table_FLEX.csv` (274 rows in extracted repo) | `Test end`: Completion, Disruption, Extinction | No numerical test metric documented; card states 80/20 split and training oversampling to 447 rows, exact partition sizes absent | UNVERIFIED; actual inference tested; model-card O2/N2/CO2 names conflict with actual preprocessor O/N/CO names; class order from README only |
+| PSI-107 fuel classification | Integrated locally; public release blocked | `models/psi107/fuel_classifier_pipeline.joblib` | `PSI-107_Experimental table_Spice.csv` (469 rows in extracted repo) | Fuel class | Card reports accuracy 0.8191; split/sample counts not documented | UNVERIFIED; local inference tested; redistribution permission unresolved; raw CSV has whitespace label variants |
+| PSI-69 flame outcome classification (`02-Model`) | Integrated locally; public release blocked | `models/psi69/dnn_cls_model.keras` + `models/psi69/dnn_cls_preprocessor.joblib` | `PSI-69_Experimental table_FLEX.csv` (274 rows in extracted repo) | `Test end`: Completion, Disruption, Extinction | No numerical test metric documented; card states 80/20 split and training oversampling to 447 rows, exact partition sizes absent | UNVERIFIED; local inference tested; redistribution permission unresolved; model-card O2/N2/CO2 names conflict with preprocessor O/N/CO names; class order from README only |
 | PSI-69 `01-Model` artifact (possible regression candidate) | BLOCKED | `dnn_model.keras` + `dnn_preprocessor.joblib` not copied | No usable provenance/model card | Target, output unit, and feature schema unknown | Not documented | BLOCKED: accompanying README and model card are empty, so model purpose/schema cannot be established |
 
 The extracted PSI-10 repository included 120 rows in the named inverse-flame CSV while each model card reports 87 samples and a 20% test partition without explaining row selection or exact train/test counts. The PSI-159 docs do not report sample counts. No downloaded-repository CSVs were copied into this backend. `VERIFIED` means original source/data independently confirmed; none of these downloaded-repository models currently meets that standard.
@@ -266,13 +266,24 @@ Health: `/health` · Swagger: `/docs` · ReDoc: `/redoc`
 
 ## Run locally
 ```bash
-python -m venv .venv
+python3.11 -m venv .venv
 source .venv/bin/activate
-pip install -r requirements.txt
+pip install -r requirements-dev.txt
 cp .env.example .env
-uvicorn app.main:app --reload --port 8000
+uvicorn app.main:app --env-file .env --reload --port 8001
 ```
-Open `http://localhost:8000/docs`.
+Open `http://localhost:8001/docs`. Python 3.11 is used because the Google GenAI SDK requires Python 3.10 or newer.
+
+## Gemini research assistant
+
+The existing `POST /api/v1/assistant/query` now answers from matching local investigation fixture records. Four additional AI endpoints summarize a record, explain existing mission rankings, generate a narrative mission report, and explain research coverage gaps. The API key is read only by the backend from `GEMINI_API_KEY`; keep it in a local ignored `.env` or a deployment secret. The backend accepts only the allowlisted `gemini-3.8-flash` model and fails closed for all other overrides; it has no model fallback. Google currently lists this model's standard input/output as free on the Gemini API Free Tier, but pricing depends on the Google project billing tier and the app cannot inspect or enforce that account setting. To avoid API token charges, use a project that remains on the Free Tier and monitor its usage. AI answers are generated from unverified demo fixtures and do not establish NASA verification, research absence, mission applicability, or safety.
+
+- `POST /api/v1/ai/research/summarize`
+- `POST /api/v1/ai/mission/explain`
+- `POST /api/v1/ai/mission/report`
+- `POST /api/v1/ai/research/gaps/explain`
+
+See [DOCKER_GEMINI_DEPLOYMENT.md](DOCKER_GEMINI_DEPLOYMENT.md) for Docker commands, environment settings, AI request shapes, Render preparation, model inventory, and troubleshooting.
 
 ### Frontend CORS configuration
 

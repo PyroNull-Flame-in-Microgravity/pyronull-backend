@@ -1,5 +1,6 @@
 """Inference service for the PSI-159 experimental burn-time model."""
 
+import hashlib
 from functools import lru_cache
 from pathlib import Path
 from typing import Any, Tuple
@@ -16,6 +17,7 @@ MODEL_PATH = (
     / "models"
     / "PSI_159_burntime_regressor_Predictive_Model.joblib"
 )
+MODEL_SHA256 = "fa63f122f984f221df53e65c778e3d2d7a3a90b2a50a28ecf066e776967a3309"
 MODEL_NAME = "PSI-159 Burn Time Regressor"
 MODEL_TYPE = "Scikit-learn Random Forest regression pipeline"
 MODEL_FEATURES: Tuple[str, ...] = (
@@ -60,6 +62,9 @@ def load_model() -> Any:
     try:
         if not MODEL_PATH.is_file():
             raise BurnTimeModelUnavailable("The PSI-159 burn-time model artifact is not installed.")
+        digest = hashlib.sha256(MODEL_PATH.read_bytes()).hexdigest()
+        if digest != MODEL_SHA256:
+            raise BurnTimeModelUnavailable("The PSI-159 burn-time model artifact failed its integrity check.")
         model = joblib.load(MODEL_PATH)
         model_features = getattr(model, "feature_names_in_", None)
         if model_features is not None and tuple(model_features) != MODEL_FEATURES:
